@@ -1,7 +1,6 @@
 import PeerMessage.*
 import bencode.getSHA1
 import io.ktor.utils.io.*
-import kotlin.math.ceil
 
 const val blockSize = 16 * 1024L
 
@@ -19,12 +18,8 @@ enum class PeerMessage(val id: Byte) {
 
 @OptIn(ExperimentalStdlibApi::class)
 suspend fun Torrent.downloadPiece(tx: ByteWriteChannel, rx: ByteReadChannel, pieceIdx: Int): ByteArray {
-    val numPieces = ceil(info.length.toDouble() / info.pieceLength).toInt()
-    val isLastPiece = pieceIdx == numPieces - 1 // 0 indexed
-    val pieceLength = if (isLastPiece) info.length % info.pieceLength else info.pieceLength
-
     var bitfieldReceived = false
-    val blocks = MutableList(ceil(pieceLength / blockSize.toDouble()).toInt()) { ByteArray(0) }
+    val blocks = MutableList(numBlocks(pieceIdx)) { ByteArray(0) }
     while (true) {
         val payloadLen = rx.readInt()
         if (payloadLen <= 0) continue
@@ -32,13 +27,13 @@ suspend fun Torrent.downloadPiece(tx: ByteWriteChannel, rx: ByteReadChannel, pie
             Bitfield.id -> {
                 // ignore the payload as it is not important
                 rx.readByteArray(payloadLen - 1)
-                send(tx, Interested, pieceIdx, pieceLength)
+                send(tx, Interested, pieceIdx, pieceLength(pieceIdx))
                 bitfieldReceived = true
             }
 
             Unchoke.id -> {
                 if (!bitfieldReceived) continue
-                send(tx, Request, pieceIdx, pieceLength)
+                send(tx, Request, pieceIdx, pieceLength(pieceIdx))
             }
 
             Piece.id -> {
@@ -47,7 +42,7 @@ suspend fun Torrent.downloadPiece(tx: ByteWriteChannel, rx: ByteReadChannel, pie
                 val block = rx.readByteArray(payloadLen - 9) // 4 + 4 bytes used above
                 blocks[(offset / blockSize).toInt()] = block
 
-                if (blocks.sumOf { it.size.toLong() } >= pieceLength) {
+                if (blocks.sumOf { it.size.toLong() } >= pieceLength(pieceIdx)) {
                     val piece = blocks.reduce { acc, bytes -> acc + bytes }
                     assert(piece.getSHA1().toHexString() == info.pieceHashes.elementAt(pieceIdx))
                     return piece

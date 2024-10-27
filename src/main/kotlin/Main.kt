@@ -23,7 +23,7 @@ suspend fun main(args: Array<String>) {
             println("Tracker URL: ${torrent.announce}")
             println("Length: ${torrent.info.length}")
             println("Info Hash: ${torrent.infoHashHex}")
-            println("Piece Length: ${torrent.info.pieceLength}")
+            println("Piece Length: ${torrent.info._pieceLength}")
             torrent.info.pieceHashes.forEach {
                 println(it)
             }
@@ -56,8 +56,7 @@ suspend fun main(args: Array<String>) {
             val torrent = Torrent.from(args[3])
             val pieceIdx = args[4]
 
-            val trackerUrl = torrent.announce
-            val peers = runBlocking { torrent.query().peers }
+            val peers = torrent.query().peers
 
             val peer = peers.toList().random()
             val (ip, port) = peer.split(':')
@@ -70,6 +69,13 @@ suspend fun main(args: Array<String>) {
                 val piece = torrent.downloadPiece(tx, rx, pieceIdx.toInt())
                 File(outputLocation).writeBytes(piece)
             }
+        }
+
+        "download" -> {
+            assert(args[1] == "-o")
+            val outputLocation = args[2]
+            val torrent = Torrent.from(args[3])
+            torrent.download(outputLocation)
         }
 
         else -> println("Unknown command $command")

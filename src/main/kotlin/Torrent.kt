@@ -10,6 +10,7 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
 import java.io.File
 import java.net.URLEncoder
+import kotlin.math.ceil
 
 data class Torrent(
     val announce: String,
@@ -53,6 +54,15 @@ data class Torrent(
         return gson.fromJson(json, TrackerResponse::class.java)
     }
 
+    fun numPieces(): Int =
+        ceil(info.length.toDouble() / info._pieceLength).toInt()
+
+    fun pieceLength(pieceIdx: Int): Long =
+        if (pieceIdx == numPieces() - 1) info.length % info._pieceLength else info._pieceLength
+
+    fun numBlocks(pieceIdx: Int): Int =
+        ceil(pieceLength(pieceIdx) / blockSize.toDouble()).toInt()
+
     companion object {
         private val gson = Gson()
         private val http = HttpClient(CIO)
@@ -74,7 +84,7 @@ data class Torrent(
 data class Info(
     val name: String,
     @SerializedName("piece length")
-    val pieceLength: Long,
+    val _pieceLength: Long,
     val pieces: String,
     val length: Long,
 ) {
