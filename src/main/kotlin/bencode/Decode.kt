@@ -55,13 +55,3 @@ private fun decodeDict(bencoded: ByteArray): Pair<Map<String, Any>, Int> {
     if (i > bencoded.lastIndex) error("Error decoding dict: End of content")
     return Pair(result, i + 1)
 }
-
-fun ByteArray.toStringDecoded(): String =
-    String(this, Charsets.ISO_8859_1)
-
-fun ByteArray.toInt(): Int =
-    toStringDecoded().toInt()
-
-
-fun ByteArray.toLong(): Long =
-    toStringDecoded().toLong()

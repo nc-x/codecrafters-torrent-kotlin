@@ -1,5 +1,6 @@
 import bencode.decode
 import bencode.encode
+import bencode.toBytes
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import java.io.File
@@ -14,7 +15,7 @@ data class Torrent(
     @OptIn(ExperimentalStdlibApi::class)
     val infoHash: String
         get() {
-            val info = encode(metadata["info"]!!).toByteArray(Charsets.ISO_8859_1)
+            val info = encode(metadata["info"]!!).toBytes()
             return MessageDigest.getInstance("SHA-1").digest(info)
                 .toHexString()
         }
@@ -43,4 +44,16 @@ data class Info(
     val pieceLength: Long,
     val pieces: String,
     val length: Long,
-)
+) {
+    @OptIn(ExperimentalStdlibApi::class)
+    val pieceHashes: Sequence<String>
+        get() {
+            val nPieces = pieces.length / 20
+            return sequence {
+                for (i in 0..<nPieces) {
+                    val piece = pieces.substring(i * 20..<(i + 1) * 20)
+                    yield(piece.toBytes().toHexString())
+                }
+            }
+        }
+}
