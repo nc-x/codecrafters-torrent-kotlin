@@ -17,12 +17,12 @@ private fun _decode(bencoded: ByteArray): Pair<Any, Int> =
 
 private fun decodeInt(bencoded: ByteArray): Pair<Long, Int> {
     val idx = bencoded.indexOfFirst { it == 'e'.code.toByte() }
-    return Pair(bencoded.sliceArray(1..<idx).toLong(), idx + 1)
+    return Pair(bencoded.sliceArray(1..<idx).parseLong(), idx + 1)
 }
 
 private fun decodeString(bencoded: ByteArray): Pair<String, Int> {
     val colonIdx = bencoded.indexOfFirst { it == ':'.code.toByte() }
-    val length = bencoded.sliceArray(0..<colonIdx).toInt()
+    val length = bencoded.sliceArray(0..<colonIdx).parseInt()
     val startIdx = colonIdx + 1
     val endIdx = startIdx + length
     val decoded = bencoded.sliceArray(colonIdx + 1..<endIdx)

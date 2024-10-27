@@ -33,6 +33,14 @@ fun main(args: Array<String>) {
             }
         }
 
+        "handshake" -> {
+            val torrent = Torrent.from(args[1])
+            val peer = args[2]
+            val (ip, port) = peer.split(':')
+            val peerId = runBlocking { torrent.handshake("00000000000000000000", ip, port.toInt()) }
+            println("Peer ID: $peerId")
+        }
+
         else -> println("Unknown command $command")
     }
 }

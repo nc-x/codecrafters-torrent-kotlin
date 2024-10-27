@@ -1,5 +1,6 @@
 import bencode.decode
 import bencode.encode
+import bencode.getSHA1
 import bencode.toBytes
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
@@ -9,7 +10,6 @@ import io.ktor.client.engine.cio.*
 import io.ktor.client.request.*
 import java.io.File
 import java.net.URLEncoder
-import java.security.MessageDigest
 
 data class Torrent(
     val announce: String,
@@ -20,7 +20,7 @@ data class Torrent(
     val infoHash: ByteArray
         get() {
             val info = encode(metadata["info"]!!).toBytes()
-            return MessageDigest.getInstance("SHA-1").digest(info)//.toHexString()
+            return info.getSHA1()
         }
 
     @OptIn(ExperimentalStdlibApi::class)
