@@ -1,10 +1,14 @@
 import bencode.decode
 import bencode.toBytes
 import com.google.gson.Gson
+import io.ktor.network.selector.*
+import io.ktor.network.sockets.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import java.io.File
 
 @OptIn(ExperimentalStdlibApi::class)
-fun main(args: Array<String>) {
+suspend fun main(args: Array<String>) {
     val gson = Gson()
 
     when (val command = args[0]) {
@@ -37,8 +41,35 @@ fun main(args: Array<String>) {
             val torrent = Torrent.from(args[1])
             val peer = args[2]
             val (ip, port) = peer.split(':')
-            val peerId = runBlocking { torrent.handshake("00000000000000000000", ip, port.toInt()) }
-            println("Peer ID: $peerId")
+            val selectorManager = SelectorManager(Dispatchers.IO)
+            aSocket(selectorManager).tcp().connect(ip, port.toInt()).use { socket ->
+                val tx = socket.openWriteChannel(autoFlush = false)
+                val rx = socket.openReadChannel()
+                val peerId = torrent.handshake(tx, rx, "00000000000000000000")
+                println("Peer ID: $peerId")
+            }
+        }
+
+        "download_piece" -> {
+            assert(args[1] == "-o")
+            val outputLocation = args[2]
+            val torrent = Torrent.from(args[3])
+            val pieceIdx = args[4]
+
+            val trackerUrl = torrent.announce
+            val peers = runBlocking { torrent.query().peers }
+
+            val peer = peers.toList().random()
+            val (ip, port) = peer.split(':')
+
+            val selectorManager = SelectorManager(Dispatchers.IO)
+            aSocket(selectorManager).tcp().connect(ip, port.toInt()).use { socket ->
+                val tx = socket.openWriteChannel(autoFlush = false)
+                val rx = socket.openReadChannel()
+                val peerId = torrent.handshake(tx, rx, "00000000000000000000")
+                val piece = torrent.downloadPiece(tx, rx, pieceIdx.toInt())
+                File(outputLocation).writeBytes(piece)
+            }
         }
 
         else -> println("Unknown command $command")
