@@ -3,7 +3,12 @@ import bencode.encode
 import bencode.toBytes
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
+import io.ktor.client.*
+import io.ktor.client.call.*
+import io.ktor.client.engine.cio.*
+import io.ktor.client.request.*
 import java.io.File
+import java.net.URLEncoder
 import java.security.MessageDigest
 
 data class Torrent(
@@ -12,16 +17,45 @@ data class Torrent(
 ) {
     private lateinit var metadata: Map<*, *>
 
-    @OptIn(ExperimentalStdlibApi::class)
-    val infoHash: String
+    val infoHash: ByteArray
         get() {
             val info = encode(metadata["info"]!!).toBytes()
-            return MessageDigest.getInstance("SHA-1").digest(info)
-                .toHexString()
+            return MessageDigest.getInstance("SHA-1").digest(info)//.toHexString()
         }
+
+    @OptIn(ExperimentalStdlibApi::class)
+    val infoHashHex: String
+        get() = infoHash.toHexString()
+
+    suspend fun query(
+        peerId: String = "00000000000000000000",
+        port: Int = 6881,
+        uploaded: Int = 0,
+        downloaded: Int = 0,
+        compact: Int = 1
+    ): TrackerResponse {
+        val response = http.get(announce) {
+            url {
+                encodedParameters.append(
+                    "info_hash", URLEncoder.encode(String(infoHash, Charsets.ISO_8859_1), "ISO-8859-1")
+                )
+                parameters.append("peer_id", peerId)
+                parameters.append("port", "$port")
+                parameters.append("uploaded", "$uploaded")
+                parameters.append("downloaded", "$downloaded")
+                parameters.append("left", "${info.length}")
+                parameters.append("compact", "$compact")
+            }
+        }
+
+        val body: ByteArray = response.body()
+        val json = gson.toJson(decode(body))
+        return gson.fromJson(json, TrackerResponse::class.java)
+    }
 
     companion object {
         private val gson = Gson()
+        private val http = HttpClient(CIO)
 
         fun from(file: String): Torrent {
             return from(File(file))
@@ -29,7 +63,6 @@ data class Torrent(
 
         fun from(file: File): Torrent {
             val decoded = decode(file.readBytes()) as Map<*, *>
-
             val json = gson.toJson(decoded)
             val torrent = gson.fromJson(json, Torrent::class.java) ?: error("invalid torrent")
             torrent.metadata = decoded
@@ -57,3 +90,28 @@ data class Info(
             }
         }
 }
+
+data class TrackerResponse(
+    @SerializedName("min interval")
+    val minInterval: Int,
+    val complete: Int,
+    val incomplete: Int,
+    val interval: Int,
+    @SerializedName("peers")
+    val _peers: String,
+) {
+    val peers: Sequence<String>
+        get() =
+            _peers.toBytes().asSequence()
+                .chunked(6)
+                .map {
+                    val ip = it.subList(0, 4).joinToString(".") { it.toUByte().toInt().toString() }
+                    val port = toInt(it.subList(4, 6).toByteArray())
+                    "$ip:$port"
+                }
+}
+
+// Different from the one in Utils.kt as that is based on the number being represented in ascii
+// Whereas this one interprets the bits as a number itself
+fun toInt(bytes: ByteArray): Int =
+    bytes.fold(0) { acc, elem -> (acc shl 8) + elem.toUByte().toInt() }
