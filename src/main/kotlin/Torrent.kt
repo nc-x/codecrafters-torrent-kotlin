@@ -28,7 +28,17 @@ data class Torrent(
     val infoHashHex: String
         get() = infoHash.toHexString()
 
-    suspend fun query(
+
+    fun numPieces(): Int =
+        ceil(info.length.toDouble() / info._pieceLength).toInt()
+
+    fun pieceLength(pieceIdx: Int): Long =
+        if (pieceIdx == numPieces() - 1) info.length % info._pieceLength else info._pieceLength
+
+    fun numBlocks(pieceIdx: Int): Int =
+        ceil(pieceLength(pieceIdx) / BLOCK_SIZE.toDouble()).toInt()
+
+    suspend fun queryTracker(
         peerId: String = "00000000000000000000",
         port: Int = 6881,
         uploaded: Int = 0,
@@ -54,18 +64,10 @@ data class Torrent(
         return gson.fromJson(json, TrackerResponse::class.java)
     }
 
-    fun numPieces(): Int =
-        ceil(info.length.toDouble() / info._pieceLength).toInt()
-
-    fun pieceLength(pieceIdx: Int): Long =
-        if (pieceIdx == numPieces() - 1) info.length % info._pieceLength else info._pieceLength
-
-    fun numBlocks(pieceIdx: Int): Int =
-        ceil(pieceLength(pieceIdx) / blockSize.toDouble()).toInt()
-
     companion object {
         private val gson = Gson()
         private val http = HttpClient(CIO)
+        const val BLOCK_SIZE = 16 * 1024L
 
         fun from(file: String): Torrent {
             return from(File(file))
@@ -116,12 +118,12 @@ data class TrackerResponse(
                 .chunked(6)
                 .map {
                     val ip = it.subList(0, 4).joinToString(".") { it.toUByte().toInt().toString() }
-                    val port = toInt(it.subList(4, 6).toByteArray())
+                    val port = it.subList(4, 6).toByteArray().toInt()
                     "$ip:$port"
                 }
 }
 
 // Different from the one in Utils.kt as that is based on the number being represented in ascii
 // Whereas this one interprets the bits as a number itself
-fun toInt(bytes: ByteArray): Int =
-    bytes.fold(0) { acc, elem -> (acc shl 8) + elem.toUByte().toInt() }
+fun ByteArray.toInt(): Int =
+    fold(0) { acc, elem -> (acc shl 8) + elem.toUByte().toInt() }
