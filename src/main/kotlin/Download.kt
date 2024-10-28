@@ -1,7 +1,9 @@
 import java.io.File
 
 suspend fun Torrent.download(outputLocation: String) {
-    val peers = queryTracker().peers
+    val trackerRequest = TrackerRequest(trackerUrl, infoHash, info.length)
+    val response = Tracker.query(trackerRequest)
+    val peers = response.peers
 
     val peer = peers.toList().random()
     val (ip, port) = peer.split(':')

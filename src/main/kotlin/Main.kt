@@ -1,7 +1,6 @@
 import bencode.decode
 import bencode.toBytes
 import com.google.gson.Gson
-import kotlinx.coroutines.runBlocking
 import magnet.Magnet
 import java.io.File
 
@@ -17,7 +16,7 @@ suspend fun main(args: Array<String>) {
 
         "info" -> {
             val torrent = Torrent.from(args[1])
-            println("Tracker URL: ${torrent.announce}")
+            println("Tracker URL: ${torrent.trackerUrl}")
             println("Length: ${torrent.info.length}")
             println("Info Hash: ${torrent.infoHashHex}")
             println("Piece Length: ${torrent.info._pieceLength}")
@@ -28,7 +27,8 @@ suspend fun main(args: Array<String>) {
 
         "peers" -> {
             val torrent = Torrent.from(args[1])
-            val response = runBlocking { torrent.queryTracker() }
+            val trackerRequest = TrackerRequest(torrent.trackerUrl, torrent.infoHash, torrent.info.length)
+            val response = Tracker.query(trackerRequest)
             response.peers.forEach {
                 println(it)
             }
@@ -50,9 +50,9 @@ suspend fun main(args: Array<String>) {
             val torrent = Torrent.from(args[3])
             val pieceIdx = args[4]
 
-            val peers = torrent.queryTracker().peers
-
-            val peer = peers.toList().random()
+            val trackerRequest = TrackerRequest(torrent.trackerUrl, torrent.infoHash, torrent.info.length)
+            val response = Tracker.query(trackerRequest)
+            val peer = response.peers.toList().random()
             val (ip, port) = peer.split(':')
 
             connect(ip, port.toInt()) {
@@ -74,13 +74,27 @@ suspend fun main(args: Array<String>) {
             val magnetLink = args[1]
             val magnet = Magnet.parse(magnetLink)
             println("Tracker URL: ${magnet.trackerUrl}")
-            println("Info Hash: ${magnet.exactTopic}")
+            println("Info Hash: ${magnet.infoHashHex}")
         }
 
         "magnet_handshake" -> {
+            val magnetLink = args[1]
+            val magnet = Magnet.parse(magnetLink)
+            val trackerRequest = TrackerRequest(
+                magnet.trackerUrl ?: error("the given magnetLink is missing the trackerURL"),
+                magnet.infoHash,
+                1
+            )
+            val response = Tracker.query(trackerRequest)
+            val peer = response.peers.toList().random()
+            val (ip, port) = peer.split(':')
+            connect(ip, port.toInt()) {
+                val peerId = handshake("00000000000000000000", magnet.infoHash, useExtensions = true)
+                println("Peer ID: $peerId")
+            }
+
         }
 
         else -> println("Unknown command $command")
     }
 }
-

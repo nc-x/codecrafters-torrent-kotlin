@@ -1,5 +1,8 @@
 package magnet
 
+import com.google.gson.Gson
+import io.ktor.client.*
+import io.ktor.client.engine.cio.*
 import io.ktor.http.*
 
 // magnet:
@@ -8,13 +11,40 @@ import io.ktor.http.*
 // &tr=http%3A%2F%2Fbittorrent-test-tracker.codecrafters.io%2Fannounce
 data class Magnet(
     val trackerUrl: String?,
-    val exactTopic: String,
+    val infoHash: ByteArray,
     val displayName: String?,
 ) {
+    @OptIn(ExperimentalStdlibApi::class)
+    val infoHashHex: String
+        get() = infoHash.toHexString()
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as Magnet
+
+        if (trackerUrl != other.trackerUrl) return false
+        if (!infoHash.contentEquals(other.infoHash)) return false
+        if (displayName != other.displayName) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = trackerUrl?.hashCode() ?: 0
+        result = 31 * result + infoHash.contentHashCode()
+        result = 31 * result + (displayName?.hashCode() ?: 0)
+        return result
+    }
+
     companion object {
         private const val MAGNET_PREFIX = "magnet:?"
         private const val XT_PREFIX = "urn:btih:"
+        private val http = HttpClient(CIO)
+        private val gson = Gson()
 
+        @OptIn(ExperimentalStdlibApi::class)
         fun parse(magnetLink: String): Magnet {
             if (!magnetLink.startsWith(MAGNET_PREFIX)) error("invalid magnet uri")
             return magnetLink
@@ -28,11 +58,10 @@ data class Magnet(
 
                     Magnet(
                         trackerUrl = params["tr"]?.decodeURLPart(),
-                        exactTopic = xt,
+                        infoHash = xt.hexToByteArray(),
                         displayName = params["dn"],
                     )
                 }
         }
     }
 }
-
