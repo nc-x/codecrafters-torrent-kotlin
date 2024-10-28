@@ -5,9 +5,9 @@ import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import magnet.Magnet
 import java.io.File
 
-@OptIn(ExperimentalStdlibApi::class)
 suspend fun main(args: Array<String>) {
     val gson = Gson()
 
@@ -76,6 +76,13 @@ suspend fun main(args: Array<String>) {
             val outputLocation = args[2]
             val torrent = Torrent.from(args[3])
             torrent.download(outputLocation)
+        }
+
+        "magnet_parse" -> {
+            val magnetLink = args[1]
+            val magnet = Magnet.parse(magnetLink)
+            println("Tracker URL: ${magnet.trackerUrl}")
+            println("Info Hash: ${magnet.exactTopic}")
         }
 
         else -> println("Unknown command $command")
