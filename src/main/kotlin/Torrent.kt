@@ -64,7 +64,7 @@ data class Torrent(
 
                 @Suppress("UNCHECKED_CAST")
                 val m = extensionMetadata["m"]!! as Map<String, Any>
-                val extendedMessageId = m["ut_metadata"].toString().toByte()
+                val extendedMessageId = m["ut_metadata"].toString().toUByte().toByte()
                 val infoMap = sendMetadataMessage(Request.id, extendedMessageId)
                 val info = gson.fromJson(gson.toJson(infoMap), Info::class.java)
                 val torrent = Torrent(magnet.trackerUrl, info)

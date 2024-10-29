@@ -114,6 +114,28 @@ suspend fun main(args: Array<String>) {
             }
         }
 
+        "magnet_download_piece" -> {
+            assert(args[1] == "-o")
+            val outputLocation = args[2]
+            val pieceIdx = args[4]
+
+            val magnetLink = args[3]
+            val magnet = Magnet.parse(magnetLink)
+            val torrent = Torrent.from(magnet)
+
+            val trackerRequest = TrackerRequest(torrent.trackerUrl, torrent.infoHash, torrent.info.length)
+            val response = Tracker.query(trackerRequest)
+            val peerIp = response.peers.toList().random()
+            val (ip, port) = peerIp.split(':')
+
+            connect(ip, port.toInt()) {
+                handshake("00000000000000000000", torrent.infoHash)
+                pingPong(reader, writer)
+                val piece = torrent.downloadPiece(pieceIdx.toInt())
+                File(outputLocation).writeBytes(piece)
+            }
+        }
+
         else -> println("Unknown command $command")
     }
 }
