@@ -19,7 +19,7 @@ data class Connection(val reader: ByteReadChannel, val writer: ByteWriteChannel)
         registerInterest(writer)
     }
 
-    private suspend fun ignoreBitfield(reader: ByteReadChannel) {
+    suspend fun ignoreBitfield(reader: ByteReadChannel) {
         val payloadLen = reader.readInt()
         assert(reader.readByte() == Bitfield.id)
         // ignore the payload as it is not important
@@ -59,5 +59,3 @@ suspend fun <T> connect(ip: String, port: Int, f: suspend Connection.() -> T): T
         return f(Connection(reader, writer))
     }
 }
-
-

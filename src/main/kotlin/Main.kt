@@ -36,11 +36,11 @@ suspend fun main(args: Array<String>) {
 
         "handshake" -> {
             val torrent = Torrent.from(args[1])
-            val peer = args[2]
-            val (ip, port) = peer.split(':')
+            val peerIp = args[2]
+            val (ip, port) = peerIp.split(':')
             connect(ip, port.toInt()) {
-                val peerId = handshake("00000000000000000000", torrent.infoHash)
-                println("Peer ID: $peerId")
+                val peer = handshake("00000000000000000000", torrent.infoHash)
+                println("Peer ID: ${peer.id}")
             }
         }
 
@@ -52,8 +52,8 @@ suspend fun main(args: Array<String>) {
 
             val trackerRequest = TrackerRequest(torrent.trackerUrl, torrent.infoHash, torrent.info.length)
             val response = Tracker.query(trackerRequest)
-            val peer = response.peers.toList().random()
-            val (ip, port) = peer.split(':')
+            val peerIp = response.peers.toList().random()
+            val (ip, port) = peerIp.split(':')
 
             connect(ip, port.toInt()) {
                 handshake("00000000000000000000", torrent.infoHash)
@@ -86,13 +86,13 @@ suspend fun main(args: Array<String>) {
                 1
             )
             val response = Tracker.query(trackerRequest)
-            val peer = response.peers.toList().random()
-            val (ip, port) = peer.split(':')
+            val peerIp = response.peers.toList().random()
+            val (ip, port) = peerIp.split(':')
             connect(ip, port.toInt()) {
-                val peerId = handshake("00000000000000000000", magnet.infoHash, useExtensions = true)
-                println("Peer ID: $peerId")
+                val peer = handshake("00000000000000000000", magnet.infoHash, useExtensions = true)
+                println("Peer ID: ${peer.id}")
+                extensionHandshake()
             }
-
         }
 
         else -> println("Unknown command $command")

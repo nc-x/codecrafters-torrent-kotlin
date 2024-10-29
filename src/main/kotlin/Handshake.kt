@@ -1,10 +1,14 @@
+import PeerMessage.Extended
+import bencode.decode
+import bencode.encode
 import bencode.toBytes
 import io.ktor.utils.io.*
-import java.util.*
 
 private const val protocol = "BitTorrent protocol"
-private const val numReservedBytes = 8
-private val reserved = BitSet(numReservedBytes * 8)
+private const val reservedLen = 8
+private val reservedWithoutExtensions = ByteArray(reservedLen)
+private val reservedWithExtensions = byteArrayOf(0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00)
+
 
 context(Connection)
 @OptIn(ExperimentalStdlibApi::class)
@@ -12,16 +16,14 @@ suspend fun handshake(
     peerId: String,
     infoHash: ByteArray,
     useExtensions: Boolean = false
-): String {
-    if (useExtensions) reserved.set(20)
-
+): Peer {
     with(writer) {
         writeByte(protocol.length.toByte())
         writeByteArray(protocol.toBytes())
         if (useExtensions) {
-            writeByteArray(byteArrayOf(0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00))
+            writeByteArray(reservedWithExtensions)
         } else {
-            writeByteArray(ByteArray(8))
+            writeByteArray(reservedWithoutExtensions)
         }
         writeByteArray(infoHash)
         writeByteArray(peerId.toBytes())
@@ -31,9 +33,40 @@ suspend fun handshake(
     with(reader) {
         assert(readByte() == protocol.length.toByte())
         assert(readByteArray(protocol.length).contentEquals(protocol.toBytes()))
-        assert(readByteArray(numReservedBytes).contentEquals(reserved.toByteArray()))
+        val reserved = readByteArray(reservedLen)
         assert(readByteArray(infoHash.size).contentEquals(infoHash))
         val responsePeerId = readByteArray(peerId.toBytes().size)
-        return responsePeerId.toHexString()
+        if (reserved[5] == 0x10.toByte())
+            return Peer(responsePeerId.toHexString(), true)
+        return Peer(responsePeerId.toHexString(), false)
+    }
+}
+
+context(Connection)
+@Suppress("UNCHECKED_CAST")
+suspend fun extensionHandshake(): Map<String, Any> {
+    ignoreBitfield(reader)
+
+    with(writer) {
+        val payload = encode(
+            mapOf(
+                "m" to mapOf(
+                    "ut_metadata" to 16L
+                )
+            )
+        ).toBytes()
+        writeInt(2 + payload.size) // length of below two
+        writeByte(Extended.id)
+        writeByte(0) // extension message id
+        writeByteArray(payload)
+        flush()
+    }
+
+    with(reader) {
+        val payloadLen = readPayloadLen(reader)
+        assert(readByte() == Extended.id)
+        assert(readByte() == 0.toByte()) // extension message id
+        val payload = readByteArray(payloadLen - 2)
+        return decode(payload) as Map<String, Any>
     }
 }

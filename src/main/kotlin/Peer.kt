@@ -8,5 +8,7 @@ enum class PeerMessage(val id: Byte) {
     Request(6),
     Piece(7),
     Cancel(8),
+    Extended(20),
 }
 
+data class Peer(val id: String, val supportsExtensions: Boolean)
