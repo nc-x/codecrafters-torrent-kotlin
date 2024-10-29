@@ -91,7 +91,11 @@ suspend fun main(args: Array<String>) {
             connect(ip, port.toInt()) {
                 val peer = handshake("00000000000000000000", magnet.infoHash, useExtensions = true)
                 println("Peer ID: ${peer.id}")
-                extensionHandshake()
+                val extensionMetadata = extensionHandshake()
+
+                @Suppress("UNCHECKED_CAST")
+                val m = extensionMetadata["m"]!! as Map<String, Any>
+                println("Peer Metadata Extension ID: ${m["ut_metadata"]}")
             }
         }
 
