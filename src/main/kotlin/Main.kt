@@ -136,6 +136,16 @@ suspend fun main(args: Array<String>) {
             }
         }
 
+        "magnet_download" -> {
+            assert(args[1] == "-o")
+            val outputLocation = args[2]
+
+            val magnetLink = args[3]
+            val magnet = Magnet.parse(magnetLink)
+            val torrent = Torrent.from(magnet)
+            torrent.download(outputLocation)
+        }
+
         else -> println("Unknown command $command")
     }
 }
