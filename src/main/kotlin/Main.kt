@@ -1,3 +1,5 @@
+import MetadataMessage.Extended
+import MetadataMessage.Request
 import bencode.decode
 import bencode.toBytes
 import com.google.gson.Gson
@@ -91,11 +93,44 @@ suspend fun main(args: Array<String>) {
             connect(ip, port.toInt()) {
                 val peer = handshake("00000000000000000000", magnet.infoHash, useExtensions = true)
                 println("Peer ID: ${peer.id}")
-                val extensionMetadata = extensionHandshake()
+                val extensionMetadata = sendMetadataMessage(Extended.id, 0)
 
                 @Suppress("UNCHECKED_CAST")
                 val m = extensionMetadata["m"]!! as Map<String, Any>
                 println("Peer Metadata Extension ID: ${m["ut_metadata"]}")
+            }
+        }
+
+        "magnet_info" -> {
+            val magnetLink = args[1]
+            val magnet = Magnet.parse(magnetLink)
+            val trackerRequest = TrackerRequest(
+                magnet.trackerUrl ?: error("the given magnetLink is missing the trackerURL"),
+                magnet.infoHash,
+                1
+            )
+            val response = Tracker.query(trackerRequest)
+            val peerIp = response.peers.toList().random()
+            val (ip, port) = peerIp.split(':')
+            connect(ip, port.toInt()) {
+                handshake("00000000000000000000", magnet.infoHash, useExtensions = true)
+                val extensionMetadata = sendMetadataMessage(Extended.id, 0)
+
+                @Suppress("UNCHECKED_CAST")
+                val m = extensionMetadata["m"]!! as Map<String, Any>
+                val extendedMessageId = m["ut_metadata"].toString().toByte()
+                val pieceInfo = sendMetadataMessage(Request.id, extendedMessageId)
+                val info = gson.fromJson(gson.toJson(pieceInfo), Info::class.java)
+                val torrent = Torrent(magnet.trackerUrl, info)
+
+                println("Tracker URL: ${magnet.trackerUrl}")
+                println("Length: ${torrent.info.length}")
+                println("Info Hash: ${magnet.infoHashHex}")
+                println("Piece Length: ${torrent.pieceLength(0)}")
+                println("Piece Hashses:")
+                info.pieceHashes.forEach {
+                    println(it)
+                }
             }
         }
 

@@ -1,6 +1,3 @@
-import PeerMessage.Extended
-import bencode.decode
-import bencode.encode
 import bencode.toBytes
 import io.ktor.utils.io.*
 
@@ -39,34 +36,5 @@ suspend fun handshake(
         if (reserved[5] == 0x10.toByte())
             return Peer(responsePeerId.toHexString(), true)
         return Peer(responsePeerId.toHexString(), false)
-    }
-}
-
-context(Connection)
-@Suppress("UNCHECKED_CAST")
-suspend fun extensionHandshake(): Map<String, Any> {
-    ignoreBitfield(reader)
-
-    with(writer) {
-        val payload = encode(
-            mapOf(
-                "m" to mapOf(
-                    "ut_metadata" to 16L
-                )
-            )
-        ).toBytes()
-        writeInt(2 + payload.size) // length of below two
-        writeByte(Extended.id)
-        writeByte(0) // extension message id
-        writeByteArray(payload)
-        flush()
-    }
-
-    with(reader) {
-        val payloadLen = readPayloadLen(reader)
-        assert(readByte() == Extended.id)
-        assert(readByte() == 0.toByte()) // extension message id
-        val payload = readByteArray(payloadLen - 2)
-        return decode(payload) as Map<String, Any>
     }
 }

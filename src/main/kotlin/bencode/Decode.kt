@@ -1,12 +1,12 @@
 package bencode
 
 fun decode(bencoded: ByteArray): Any {
-    val decoded = _decode(bencoded)
+    val decoded = decodeStream(bencoded)
     if (decoded.second != bencoded.size) error("Error decoding: Extra content")
     return decoded.first
 }
 
-private fun _decode(bencoded: ByteArray): Pair<Any, Int> =
+fun decodeStream(bencoded: ByteArray): Pair<Any, Int> =
     when (bencoded[0]) {
         'i'.code.toByte() -> decodeInt(bencoded)
         'l'.code.toByte() -> decodeList(bencoded)
@@ -33,7 +33,7 @@ private fun decodeList(bencoded: ByteArray): Pair<List<Any>, Int> {
     val result = mutableListOf<Any>()
     var i = 1 // skip 0th: 'l'
     while (i < bencoded.lastIndex && bencoded[i] != 'e'.code.toByte()) {
-        val (elem, len) = _decode(bencoded.sliceArray(i..bencoded.lastIndex))
+        val (elem, len) = decodeStream(bencoded.sliceArray(i..bencoded.lastIndex))
         result.add(elem)
         i += len
     }
@@ -48,7 +48,7 @@ private fun decodeDict(bencoded: ByteArray): Pair<Map<String, Any>, Int> {
         val (key, len1) = decodeString(bencoded.sliceArray(i..bencoded.lastIndex))
         i += len1
         if (i > bencoded.lastIndex) error("Error decoding dict: End of content")
-        val (value, len2) = _decode(bencoded.sliceArray(i..bencoded.lastIndex))
+        val (value, len2) = decodeStream(bencoded.sliceArray(i..bencoded.lastIndex))
         i += len2
         result[key] = value
     }
