@@ -1,9 +1,12 @@
+import MetadataMessage.Extended
+import MetadataMessage.Request
 import bencode.decode
 import bencode.encode
 import bencode.getSHA1
 import bencode.toBytes
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
+import magnet.Magnet
 import java.io.File
 import kotlin.math.ceil
 
@@ -16,7 +19,7 @@ data class Torrent(
 
     val infoHash: ByteArray
         get() {
-            val info = encode(metadata["info"]!!).toBytes()
+            val info = encode(metadata).toBytes()
             return info.getSHA1()
         }
 
@@ -38,16 +41,36 @@ data class Torrent(
         private val gson = Gson()
         const val BLOCK_SIZE = 16 * 1024L
 
-        fun from(file: String): Torrent {
-            return from(File(file))
-        }
-
         fun from(file: File): Torrent {
             val decoded = decode(file.readBytes()) as Map<*, *>
             val json = gson.toJson(decoded)
             val torrent = gson.fromJson(json, Torrent::class.java) ?: error("invalid torrent")
-            torrent.metadata = decoded
+            torrent.metadata = (decoded["info"] as Map<*, *>?)!!
             return torrent
+        }
+
+        suspend fun from(magnet: Magnet): Torrent {
+            val trackerRequest = TrackerRequest(
+                magnet.trackerUrl ?: error("the given magnetLink is missing the trackerURL"),
+                magnet.infoHash,
+                1
+            )
+            val response = Tracker.query(trackerRequest)
+            val peerIp = response.peers.toList().random()
+            val (ip, port) = peerIp.split(':')
+            return connect(ip, port.toInt()) {
+                handshake("00000000000000000000", magnet.infoHash, useExtensions = true)
+                val extensionMetadata = sendMetadataMessage(Extended.id, 0)
+
+                @Suppress("UNCHECKED_CAST")
+                val m = extensionMetadata["m"]!! as Map<String, Any>
+                val extendedMessageId = m["ut_metadata"].toString().toByte()
+                val infoMap = sendMetadataMessage(Request.id, extendedMessageId)
+                val info = gson.fromJson(gson.toJson(infoMap), Info::class.java)
+                val torrent = Torrent(magnet.trackerUrl, info)
+                torrent.metadata = infoMap
+                torrent
+            }
         }
     }
 }

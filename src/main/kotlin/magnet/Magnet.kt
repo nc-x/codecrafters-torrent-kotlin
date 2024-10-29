@@ -1,8 +1,5 @@
 package magnet
 
-import com.google.gson.Gson
-import io.ktor.client.*
-import io.ktor.client.engine.cio.*
 import io.ktor.http.*
 
 // magnet:
@@ -41,8 +38,6 @@ data class Magnet(
     companion object {
         private const val MAGNET_PREFIX = "magnet:?"
         private const val XT_PREFIX = "urn:btih:"
-        private val http = HttpClient(CIO)
-        private val gson = Gson()
 
         @OptIn(ExperimentalStdlibApi::class)
         fun parse(magnetLink: String): Magnet {
